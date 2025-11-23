@@ -22,9 +22,10 @@ context("AwsKmsSigner", () => {
     });
 
     it("Should return correct public key", async () => {
-      expect(await signer.getAddress()).to.eql(
-        "0x27d30941a21923e25a7429e3e576e9609c012a27"
-      );
+      const publicKeyBytes = ethers.decodeBase64(process.env.TEST_PUBLIC_KEY!);
+      const publicKeyHash = ethers.keccak256(publicKeyBytes.slice(-64));
+      const address = `0x${publicKeyHash.substring(26)}`;
+      expect(await signer.getAddress()).to.eql(address);
     });
 
     it("Should get sign a message", async () => {
@@ -44,6 +45,22 @@ context("AwsKmsSigner", () => {
         publicAddress.toLowerCase()
       );
     });
+
+    it("should send a signed transaction using KMS signer", async () => {
+      const provider = new ethers.JsonRpcProvider(process.env.TEST_RPC_URL);
+      const wallet = ethers.Wallet.createRandom();
+      const beforeBalance = await provider.getBalance(wallet.address);
+      const connectedSigner = signer.connect(provider);
+      const value = ethers.parseEther("0.01");
+      const tx = await connectedSigner.sendTransaction({
+        to: wallet.address,
+        value: value,
+      });
+      const receipt = await tx.wait();
+      expect(receipt?.status).to.equal(1);
+      const afterBalance = await provider.getBalance(wallet.address);
+      expect(afterBalance).to.equal(beforeBalance + value);
+    }).timeout(60000);
   });
 
   describe("AWS SSO", () => {
@@ -67,16 +84,6 @@ context("AwsKmsSigner", () => {
       expect(recoveredAddress.toLowerCase()).to.equal(
         publicAddress.toLowerCase()
       );
-    });
-  });
-
-  it("should send a signed transaction using KMS signer", async () => {
-    const provider = new ethers.JsonRpcProvider(process.env.TEST_RPC_URL);
-    const connectedSigner = signer.connect(provider);
-    const tx = await connectedSigner.sendTransaction({
-      to: "0xBac8ECdbc45A50d3bda7246bB2AA64Fc449C7924",
-      value: ethers.parseEther("0.001"),
-    });
-    await tx.wait();
+    }).timeout(15000);
   });
 });
