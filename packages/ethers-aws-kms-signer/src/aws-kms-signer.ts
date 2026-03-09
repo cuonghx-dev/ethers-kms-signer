@@ -38,9 +38,10 @@ import {
 } from "ethers";
 
 export type EthersAwsKmsSignerConfig = {
-  credentials: AwsCredentialIdentityProvider | AwsCredentialIdentity;
+  credentials?: AwsCredentialIdentityProvider | AwsCredentialIdentity;
   region: string;
   keyId: string;
+  GrantTokens?: string[];
 };
 
 export class AwsKmsSigner<
@@ -63,7 +64,10 @@ export class AwsKmsSigner<
 
   async getAddress(): Promise<string> {
     if (!this.address) {
-      const command = new GetPublicKeyCommand({ KeyId: this.config.keyId });
+      const command = new GetPublicKeyCommand({
+        KeyId: this.config.keyId,
+        GrantTokens: this.config.GrantTokens,
+      });
       const response = await this.client.send(command);
 
       const publicKeyHex = response.PublicKey;
@@ -166,7 +170,7 @@ export class AwsKmsSigner<
 
   private _createKMSClient(
     region: string,
-    credentials: AwsCredentialIdentityProvider | AwsCredentialIdentity
+    credentials?: AwsCredentialIdentityProvider | AwsCredentialIdentity
   ) {
     return new KMSClient({ region, credentials });
   }
@@ -184,6 +188,7 @@ export class AwsKmsSigner<
       Message: getBytes(digest),
       MessageType: "DIGEST",
       SigningAlgorithm: "ECDSA_SHA_256",
+      GrantTokens: this.config.GrantTokens,
     });
 
     const response = await this.client.send(command);
